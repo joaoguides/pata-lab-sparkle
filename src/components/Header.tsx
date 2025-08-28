@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
+import { useCart } from "@/context/CartContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,12 +22,24 @@ import {
 const Header = () => {
   const [selectedSpecies, setSelectedSpecies] = useState<"CACHORRO" | "GATO" | null>(null);
   const { session } = useSession();
+  const { itemCount, setIsOpen } = useCart();
   const navigate = useNavigate();
 
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/");
   }
+
+  const menuItems = [
+    { name: "Cães", href: "/caes" },
+    { name: "Gatos", href: "/gatos" },
+    { name: "Acessórios", href: "/acessorios" },
+    { name: "Camas", href: "/camas" },
+    { name: "Comer e Beber", href: "/comer-beber" },
+    { name: "Higiene", href: "/higiene" },
+    { name: "Brinquedos", href: "/brinquedos" },
+    { name: "Areias", href: "/areias" },
+  ];
 
   const categories = {
     CACHORRO: [
@@ -50,7 +63,7 @@ const Header = () => {
   };
 
   return (
-    <header className="border-b bg-background sticky top-0 z-50">
+    <header className="border-b bg-background sticky top-0 z-50 shadow-sm">
       {/* Top banner */}
       <div className="bg-accent text-accent-foreground py-2 text-center text-sm font-medium">
         🐾 PIX 10% OFF + Frete grátis acima de R$ 99 🐾
@@ -60,64 +73,64 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <div className="text-2xl font-bold text-primary">
               🐾 Pata Lab
             </div>
-          </div>
+          </Link>
 
-          {/* Species selector - Desktop */}
-          <div className="hidden md:flex items-center gap-2">
-            <Button
-              variant={selectedSpecies === "CACHORRO" ? "default" : "outline"}
-              onClick={() => setSelectedSpecies(selectedSpecies === "CACHORRO" ? null : "CACHORRO")}
-            >
-              🐕 Cães
-            </Button>
-            <Button
-              variant={selectedSpecies === "GATO" ? "default" : "outline"}
-              onClick={() => setSelectedSpecies(selectedSpecies === "GATO" ? null : "GATO")}
-            >
-              🐱 Gatos
-            </Button>
-          </div>
+          {/* Navigation menu - Desktop */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {menuItems.map((item) => (
+              <Button key={item.name} variant="ghost" asChild>
+                <Link to={item.href} className="text-sm">{item.name}</Link>
+              </Button>
+            ))}
+          </nav>
 
           {/* Search bar */}
           <div className="flex-1 max-w-md relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Buscar produtos..."
-              className="pl-10"
+              className="pl-10 rounded-2xl"
             />
           </div>
 
           {/* User actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="rounded-2xl">
               <Heart className="h-5 w-5" />
               <span className="sr-only">Lista de desejos</span>
             </Button>
             
-            <Button variant="ghost" size="icon" className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative rounded-2xl"
+              onClick={() => setIsOpen(true)}
+            >
               <ShoppingCart className="h-5 w-5" />
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              >
-                0
-              </Badge>
+              {itemCount > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                >
+                  {itemCount}
+                </Badge>
+              )}
               <span className="sr-only">Carrinho</span>
             </Button>
 
             {session ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="rounded-2xl">
                     <User className="h-5 w-5" />
                     <span className="sr-only">Minha conta</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="bg-background border shadow-lg">
                   <DropdownMenuItem asChild>
                     <Link to="/meus-pedidos">Meus pedidos</Link>
                   </DropdownMenuItem>
@@ -130,11 +143,11 @@ const Header = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex gap-2">
-                <Button asChild variant="ghost" size="sm">
+              <div className="hidden sm:flex gap-2">
+                <Button asChild variant="ghost" size="sm" className="rounded-2xl">
                   <Link to="/entrar">Entrar</Link>
                 </Button>
-                <Button asChild variant="outline" size="sm">
+                <Button asChild size="sm" className="rounded-2xl">
                   <Link to="/criar-conta">Criar conta</Link>
                 </Button>
               </div>
@@ -143,27 +156,33 @@ const Header = () => {
             {/* Mobile menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
+                <Button variant="ghost" size="icon" className="lg:hidden rounded-2xl">
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent>
+              <SheetContent className="bg-background">
                 <div className="flex flex-col gap-4 mt-4">
-                  <Button
-                    variant={selectedSpecies === "CACHORRO" ? "default" : "outline"}
-                    className="w-full"
-                    onClick={() => setSelectedSpecies(selectedSpecies === "CACHORRO" ? null : "CACHORRO")}
-                  >
-                    🐕 Cães
-                  </Button>
-                  <Button
-                    variant={selectedSpecies === "GATO" ? "default" : "outline"}
-                    className="w-full"
-                    onClick={() => setSelectedSpecies(selectedSpecies === "GATO" ? null : "GATO")}
-                  >
-                    🐱 Gatos
-                  </Button>
+                  {/* Auth buttons on mobile */}
+                  {!session && (
+                    <div className="flex flex-col gap-2 pb-4 border-b">
+                      <Button asChild className="w-full rounded-2xl">
+                        <Link to="/entrar">Entrar</Link>
+                      </Button>
+                      <Button asChild variant="outline" className="w-full rounded-2xl">
+                        <Link to="/criar-conta">Criar conta</Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Navigation items */}
+                  <div className="space-y-2">
+                    {menuItems.map((item) => (
+                      <Button key={item.name} variant="ghost" asChild className="w-full justify-start">
+                        <Link to={item.href}>{item.name}</Link>
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
