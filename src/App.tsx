@@ -11,6 +11,9 @@ import NotFound from "./pages/NotFound";
 import Entrar from "./pages/Entrar";
 import CriarConta from "./pages/CriarConta";
 import Produto from "./pages/Produto";
+import Categoria from "./pages/Categoria";
+import Buscar from "./pages/Buscar";
+import Favoritos from "./pages/Favoritos";
 import Checkout from "./pages/Checkout";
 import MeusPedidos from "./pages/MeusPedidos";
 import Enderecos from "./pages/Enderecos";
@@ -31,6 +34,9 @@ const App = () => (
               <Route path="/entrar" element={<Entrar />} />
               <Route path="/criar-conta" element={<CriarConta />} />
               <Route path="/produto/:slug" element={<Produto />} />
+              <Route path="/categoria/:slug" element={<Categoria />} />
+              <Route path="/buscar" element={<Buscar />} />
+              <Route path="/favoritos" element={<Favoritos />} />
               <Route path="/checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
               <Route path="/meus-pedidos" element={<RequireAuth><MeusPedidos /></RequireAuth>} />
               <Route path="/enderecos" element={<RequireAuth><Enderecos /></RequireAuth>} />

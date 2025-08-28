@@ -31,14 +31,14 @@ const Header = () => {
   }
 
   const menuItems = [
-    { name: "Cães", href: "/caes" },
-    { name: "Gatos", href: "/gatos" },
-    { name: "Acessórios", href: "/acessorios" },
-    { name: "Camas", href: "/camas" },
-    { name: "Comer e Beber", href: "/comer-beber" },
-    { name: "Higiene", href: "/higiene" },
-    { name: "Brinquedos", href: "/brinquedos" },
-    { name: "Areias", href: "/areias" },
+    { name: "Cães", href: "/categoria/caes" },
+    { name: "Gatos", href: "/categoria/gatos" },
+    { name: "Acessórios", href: "/categoria/acessorios" },
+    { name: "Camas", href: "/categoria/camas" },
+    { name: "Comer e Beber", href: "/categoria/comer-beber" },
+    { name: "Higiene", href: "/categoria/higiene" },
+    { name: "Brinquedos", href: "/categoria/brinquedos" },
+    { name: "Areias", href: "/categoria/areias" },
   ];
 
   const categories = {
@@ -89,19 +89,33 @@ const Header = () => {
           </nav>
 
           {/* Search bar */}
-          <div className="flex-1 max-w-md relative">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const query = formData.get("search") as string;
+              if (query.trim()) {
+                navigate(`/buscar?q=${encodeURIComponent(query.trim())}`);
+              }
+            }}
+            className="flex-1 max-w-md relative"
+          >
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
+              name="search"
               placeholder="Buscar produtos..."
               className="pl-10 rounded-2xl"
+              defaultValue={window.location.pathname === '/buscar' ? new URLSearchParams(window.location.search).get('q') || '' : ''}
             />
-          </div>
+          </form>
 
           {/* User actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-2xl">
-              <Heart className="h-5 w-5" />
-              <span className="sr-only">Lista de desejos</span>
+            <Button variant="ghost" size="icon" className="rounded-2xl" asChild>
+              <Link to="/favoritos">
+                <Heart className="h-5 w-5" />
+                <span className="sr-only">Lista de desejos</span>
+              </Link>
             </Button>
             
             <Button 
