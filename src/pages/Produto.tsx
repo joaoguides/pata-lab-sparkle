@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useCart } from "@/context/CartContext";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +50,18 @@ export default function Produto() {
       loadProduct();
     }
   }, [slug]);
+
+  useEffect(() => {
+    if (product) {
+      // Track product view
+      const selectedVariant = product.variants.find(v => v.id === selectedVariantId);
+      track("view_item", { 
+        slug, 
+        product_id: product.id, 
+        price: selectedVariant?.price || 0 
+      });
+    }
+  }, [product, slug, selectedVariantId]);
 
   const loadProduct = async () => {
     try {
@@ -116,6 +130,15 @@ export default function Produto() {
     setAddingToCart(true);
     try {
       await addItem(selectedVariantId, 1);
+      
+      // Track add to cart event
+      const selectedVariant = product?.variants.find(v => v.id === selectedVariantId);
+      track("add_to_cart", { 
+        variant_id: selectedVariantId, 
+        qty: 1, 
+        price: selectedVariant?.price || 0 
+      });
+      
       toast({
         title: "Item adicionado!",
         description: "Produto adicionado ao seu carrinho",
@@ -166,8 +189,46 @@ export default function Produto() {
     ? Math.round(((selectedVariant.compare_at_price! - selectedVariant.price) / selectedVariant.compare_at_price!) * 100)
     : 0;
 
+  // Generate JSON-LD structured data
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.name,
+    "image": Array.isArray(product.images) ? product.images : [],
+    "description": product.description || "",
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || "Pata Lab"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": selectedVariant?.price || 0,
+      "priceCurrency": "BRL",
+      "availability": selectedVariant?.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+    },
+    ...(product.rating_count > 0 && {
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": product.rating_avg,
+        "reviewCount": product.rating_count
+      }
+    })
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{product.name} - Pata Lab</title>
+        <meta name="description" content={product.description || `${product.name} na Pata Lab. ${product.brand ? `Marca ${product.brand}.` : ''} Entrega rápida e frete grátis acima de R$ 99.`} />
+        <meta property="og:title" content={`${product.name} - Pata Lab`} />
+        <meta property="og:description" content={product.description || `${product.name} na Pata Lab`} />
+        <meta property="og:type" content="product" />
+        <meta property="og:image" content={Array.isArray(product.images) ? product.images[0] : "/placeholder.svg"} />
+        <script type="application/ld+json">
+          {JSON.stringify(jsonLd)}
+        </script>
+      </Helmet>
+
       <Header />
       
       <main className="container mx-auto px-4 py-8">

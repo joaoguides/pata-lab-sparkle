@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,31 +10,18 @@ import { ArrowRight, Star, Heart, Award, Truck, Shield, CreditCard } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import { ensureActiveCart } from "@/lib/cart";
 import { runCheckout } from "@/lib/checkout";
+import { track } from "@/lib/analytics";
+import { useEffect } from "react";
 
 const Index = () => {
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [totals, setTotals] = useState<{ subtotal:number; discount:number; total:number }|null>(null);
   const [errorMsg, setErrorMsg] = useState<string|null>(null);
-  const [devEmail, setDevEmail] = useState("");
-  const [devPass, setDevPass] = useState("");
-  const [authMsg, setAuthMsg] = useState<string|null>(null);
 
-  async function handleDevSignup() {
-    setAuthMsg(null);
-    const { error } = await supabase.auth.signUp({ email: devEmail, password: devPass });
-    setAuthMsg(error ? error.message : "Conta criada! Verifique seu e-mail e depois faça login.");
-  }
-
-  async function handleDevLogin() {
-    setAuthMsg(null);
-    const { error } = await supabase.auth.signInWithPassword({ email: devEmail, password: devPass });
-    setAuthMsg(error ? error.message : "Login ok!");
-  }
-
-  async function handleDevLogout() {
-    await supabase.auth.signOut();
-    setAuthMsg("Saiu da sessão.");
-  }
+  useEffect(() => {
+    // Track home page view
+    track("view_home");
+  }, []);
 
   async function handleTestCheckout() {
     setErrorMsg(null);
@@ -111,6 +99,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Pata Lab — Tudo para seu pet</title>
+        <meta name="description" content="A melhor loja online para pets no Brasil. Ração, brinquedos, acessórios e muito mais com frete grátis acima de R$ 99." />
+        <meta property="og:title" content="Pata Lab — Tudo para seu pet" />
+        <meta property="og:description" content="A melhor loja online para pets no Brasil. Ração, brinquedos, acessórios e muito mais com frete grátis acima de R$ 99." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://patalab.lovable.app/" />
+        <meta property="og:image" content="https://patalab.lovable.app/placeholder.svg" />
+      </Helmet>
+
       <Header />
       
       <main>
@@ -145,38 +143,6 @@ const Index = () => {
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-2xl blur-3xl"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Dev Login Section */}
-        {/* TODO: remover após telas de auth finalizadas */}
-        <section className="py-8">
-          <div className="container mx-auto px-4">
-            <div className="my-6 p-4 rounded-xl border bg-white">
-              <h3 className="font-semibold mb-2">Login rápido (DEV)</h3>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  value={devEmail}
-                  onChange={e=>setDevEmail(e.target.value)}
-                  placeholder="email@exemplo.com"
-                  className="border rounded-lg px-3 py-2 flex-1"
-                  type="email"
-                />
-                <input
-                  value={devPass}
-                  onChange={e=>setDevPass(e.target.value)}
-                  placeholder="Senha"
-                  className="border rounded-lg px-3 py-2 flex-1"
-                  type="password"
-                />
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <button onClick={handleDevSignup} className="rounded-xl px-3 py-2 border">Criar conta</button>
-                <button onClick={handleDevLogin} className="rounded-xl px-3 py-2 bg-primary text-primary-foreground">Entrar</button>
-                <button onClick={handleDevLogout} className="rounded-xl px-3 py-2">Sair</button>
-                {authMsg && <span className="text-sm text-muted-foreground">{authMsg}</span>}
               </div>
             </div>
           </div>

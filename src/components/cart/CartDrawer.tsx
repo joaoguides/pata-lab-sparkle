@@ -214,7 +214,7 @@ export default function CartDrawer() {
           )}
         </div>
 
-        {/* Footer */}
+          {/* Footer */}
         {session && items.length > 0 && (
           <div className="border-t p-4">
             <Button 
