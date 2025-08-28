@@ -3,6 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, ShoppingCart, User, Heart, Menu } from "lucide-react";
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/hooks/useSession";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +20,13 @@ import {
 
 const Header = () => {
   const [selectedSpecies, setSelectedSpecies] = useState<"CACHORRO" | "GATO" | null>(null);
+  const { session } = useSession();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    navigate("/");
+  }
 
   const categories = {
     CACHORRO: [
@@ -99,18 +109,36 @@ const Header = () => {
               <span className="sr-only">Carrinho</span>
             </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <User className="h-5 w-5" />
-                  <span className="sr-only">Menu do usuário</span>
+            {session ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <User className="h-5 w-5" />
+                    <span className="sr-only">Minha conta</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/meus-pedidos">Meus pedidos</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/enderecos">Endereços</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex gap-2">
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/entrar">Entrar</Link>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>Entrar</DropdownMenuItem>
-                <DropdownMenuItem>Criar conta</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/criar-conta">Criar conta</Link>
+                </Button>
+              </div>
+            )}
 
             {/* Mobile menu */}
             <Sheet>
