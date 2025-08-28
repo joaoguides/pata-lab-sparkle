@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,8 +6,32 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import { ArrowRight, Star, Heart, Award, Truck, Shield, CreditCard } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { ensureActiveCart } from "@/lib/cart";
+import { runCheckout } from "@/lib/checkout";
 
 const Index = () => {
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [totals, setTotals] = useState<{ subtotal:number; discount:number; total:number }|null>(null);
+  const [errorMsg, setErrorMsg] = useState<string|null>(null);
+
+  async function handleTestCheckout() {
+    setErrorMsg(null);
+    setTotals(null);
+    setLoadingCheckout(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setErrorMsg("Faça login para testar o checkout."); return; }
+      const cartId = await ensureActiveCart(session.user.id);
+      const res = await runCheckout(cartId);
+      setTotals(res);
+    } catch (err:any) {
+      setErrorMsg(err.message || "Erro no checkout");
+    } finally {
+      setLoadingCheckout(false);
+    }
+  }
+
   // Mock data for demonstration
   const featuredProducts = [
     {
@@ -101,6 +126,31 @@ const Index = () => {
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-2xl blur-3xl"></div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Test Checkout Section */}
+        <section className="py-8">
+          <div className="container mx-auto px-4">
+            <div className="my-6 p-4 rounded-xl border bg-white">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleTestCheckout}
+                  disabled={loadingCheckout}
+                  className="rounded-xl px-4 py-2 bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  {loadingCheckout ? "Processando..." : "Testar checkout"}
+                </button>
+                {errorMsg && <span className="text-destructive text-sm">{errorMsg}</span>}
+              </div>
+              {totals && (
+                <div className="mt-3 text-sm">
+                  <div>Subtotal: <strong>R$ {totals.subtotal.toFixed(2)}</strong></div>
+                  <div>Desconto: <strong>R$ {totals.discount.toFixed(2)}</strong></div>
+                  <div>Total: <strong>R$ {totals.total.toFixed(2)}</strong></div>
+                </div>
+              )}
             </div>
           </div>
         </section>
