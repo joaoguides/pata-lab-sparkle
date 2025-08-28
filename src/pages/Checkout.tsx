@@ -14,8 +14,9 @@ import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureActiveCart } from "@/lib/cart";
 import { runCheckout } from "@/lib/checkout";
+import { useToast } from "@/hooks/use-toast";
 import { track } from "@/lib/analytics";
-import { toast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import { CreditCard, MapPin, Package } from "lucide-react";
 
 interface Address {
@@ -55,6 +56,8 @@ const steps = [
 
 export default function Checkout() {
   const { session } = useSession();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
@@ -65,6 +68,7 @@ export default function Checkout() {
   const [totals, setTotals] = useState<{ subtotal: number; discount: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCoupon, setLoadingCoupon] = useState(false);
+  const [loadingOrder, setLoadingOrder] = useState(false);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -201,18 +205,54 @@ export default function Checkout() {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleFinishOrder = () => {
-    // Simulate order creation
-    track("purchase", { 
-      cart_id: cartId, 
-      total: totals?.total || 0,
-      payment_method: paymentMethod 
-    });
-    
-    toast({
-      title: "Pedido criado (simulado)",
-      description: "Integração de pagamento virá depois",
-    });
+  const handleFinishOrder = async () => {
+    if (!selectedAddressId || !cartId) {
+      toast({
+        title: "Erro",
+        description: "Selecione um endereço para continuar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoadingOrder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("place-order", {
+        body: { 
+          address_id: selectedAddressId, 
+          payment_method: paymentMethod, 
+          coupon_code: couponCode || null 
+        }
+      });
+
+      if (error) throw error;
+
+      // Track successful purchase
+      track("purchase", { 
+        order_id: data.order_id,
+        cart_id: cartId, 
+        total: data.total,
+        payment_method: paymentMethod 
+      });
+      
+      toast({
+        title: "Pedido criado com sucesso!",
+        description: `Referência: ${data.payment.reference}`,
+      });
+
+      // Navigate to orders page
+      navigate("/meus-pedidos");
+      
+    } catch (error: any) {
+      console.error("Error creating order:", error);
+      toast({
+        title: "Erro ao criar pedido",
+        description: error.message || "Tente novamente mais tarde",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingOrder(false);
+    }
   };
 
   if (loading) {
@@ -509,8 +549,9 @@ export default function Checkout() {
                       <Button 
                         onClick={handleFinishOrder}
                         className="w-full"
+                        disabled={loadingOrder}
                       >
-                        Finalizar Pedido
+                        {loadingOrder ? "Processando..." : "Finalizar Pedido"}
                       </Button>
                     )}
                   </div>

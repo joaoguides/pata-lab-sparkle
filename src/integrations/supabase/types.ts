@@ -747,6 +747,16 @@ export type Database = {
         Args: { p_cart: string; p_code: string }
         Returns: Json
       }
+      create_order: {
+        Args: {
+          p_address: string
+          p_cart: string
+          p_coupon?: string
+          p_payment_method: string
+          p_user: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       coupon_type: "PERCENT" | "FIXED"
