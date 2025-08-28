@@ -29,7 +29,7 @@ export type Database = {
           state: string
           street: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           cep: string
@@ -45,7 +45,7 @@ export type Database = {
           state: string
           street: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           cep?: string
@@ -61,7 +61,7 @@ export type Database = {
           state?: string
           street?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -116,24 +116,27 @@ export type Database = {
           created_at: string | null
           id: string
           session_id: string | null
+          status: string | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           coupon_id?: string | null
           created_at?: string | null
           id?: string
           session_id?: string | null
+          status?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           coupon_id?: string | null
           created_at?: string | null
           id?: string
           session_id?: string | null
+          status?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -354,7 +357,7 @@ export type Database = {
           subtotal: number
           total: number
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
@@ -368,7 +371,7 @@ export type Database = {
           subtotal: number
           total: number
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
@@ -382,7 +385,7 @@ export type Database = {
           subtotal?: number
           total?: number
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -740,7 +743,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      apply_coupon: {
+        Args: { p_cart: string; p_code: string }
+        Returns: Json
+      }
     }
     Enums: {
       coupon_type: "PERCENT" | "FIXED"
