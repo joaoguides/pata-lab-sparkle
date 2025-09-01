@@ -352,6 +352,7 @@ export type Database = {
           id: string
           notes: string | null
           number: number
+          paid_at: string | null
           shipping_cost: number | null
           status: Database["public"]["Enums"]["order_status"] | null
           subtotal: number
@@ -366,6 +367,7 @@ export type Database = {
           id?: string
           notes?: string | null
           number?: number
+          paid_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"] | null
           subtotal: number
@@ -380,6 +382,7 @@ export type Database = {
           id?: string
           notes?: string | null
           number?: number
+          paid_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"] | null
           subtotal?: number
@@ -399,6 +402,7 @@ export type Database = {
           order_id: string
           payload: Json | null
           provider: string
+          reference: string | null
           status: string
           updated_at: string | null
         }
@@ -411,6 +415,7 @@ export type Database = {
           order_id: string
           payload?: Json | null
           provider: string
+          reference?: string | null
           status: string
           updated_at?: string | null
         }
@@ -423,6 +428,7 @@ export type Database = {
           order_id?: string
           payload?: Json | null
           provider?: string
+          reference?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -767,6 +773,8 @@ export type Database = {
         | "SHIPPED"
         | "DELIVERED"
         | "CANCELED"
+        | "CANCELLED"
+        | "FAILED"
       species: "CACHORRO" | "GATO" | "GERAL"
       user_role: "ADMIN" | "CUSTOMER"
     }
@@ -904,6 +912,8 @@ export const Constants = {
         "SHIPPED",
         "DELIVERED",
         "CANCELED",
+        "CANCELLED",
+        "FAILED",
       ],
       species: ["CACHORRO", "GATO", "GERAL"],
       user_role: ["ADMIN", "CUSTOMER"],
