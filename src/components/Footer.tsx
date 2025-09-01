@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -9,8 +10,10 @@ import {
   MapPin,
   CreditCard,
   Shield,
-  Truck
+  Truck,
+  Youtube
 } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 const Footer = () => {
   return (
@@ -41,64 +44,67 @@ const Footer = () => {
 
         {/* Main footer content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-          {/* Company info */}
+          {/* Loja */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl font-bold text-primary">🐾 Pata Lab</span>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Tudo para seu melhor amigo, entregue com carinho. 
-              A maior variedade de produtos pet com os melhores preços.
-            </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="icon">
-                <Facebook className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Instagram className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Categories */}
-          <div>
-            <h4 className="font-semibold mb-4">Categorias</h4>
+            <h4 className="font-semibold mb-4">Loja</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Alimentos</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Brinquedos</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Acessórios</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Higiene</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Camas e Capas</a></li>
+              <li><Link to="/categoria/caes" className="text-muted-foreground hover:text-foreground">Cães</Link></li>
+              <li><Link to="/categoria/gatos" className="text-muted-foreground hover:text-foreground">Gatos</Link></li>
+              <li><Link to="/categoria/brinquedos" className="text-muted-foreground hover:text-foreground">Brinquedos</Link></li>
+              <li><Link to="/categoria/higiene" className="text-muted-foreground hover:text-foreground">Higiene</Link></li>
+              <li><Link to="/categoria/camas" className="text-muted-foreground hover:text-foreground">Camas</Link></li>
             </ul>
           </div>
 
-          {/* Support */}
+          {/* Ajuda */}
           <div>
-            <h4 className="font-semibold mb-4">Atendimento</h4>
+            <h4 className="font-semibold mb-4">Ajuda</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Central de Ajuda</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground">Entrega</a></li>
               <li><a href="#" className="text-muted-foreground hover:text-foreground">Trocas e Devoluções</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Política de Frete</a></li>
+              <li><a href={`https://wa.me/${siteConfig.company.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">Suporte WhatsApp</a></li>
               <li><a href="#" className="text-muted-foreground hover:text-foreground">Rastreamento</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-foreground">Contato</a></li>
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Institucional */}
           <div>
-            <h4 className="font-semibold mb-4">Contato</h4>
+            <h4 className="font-semibold mb-4">Institucional</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="text-muted-foreground hover:text-foreground">Sobre</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground">Contato</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground">Carreiras</a></li>
+            </ul>
+          </div>
+
+          {/* Siga-nos */}
+          <div>
+            <h4 className="font-semibold mb-4">Siga-nos</h4>
+            <div className="flex gap-2 mb-4">
+              <Button variant="ghost" size="icon" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                  <Instagram className="h-4 w-4" />
+                </a>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+                  <Youtube className="h-4 w-4" />
+                </a>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                  <Facebook className="h-4 w-4" />
+                </a>
+              </Button>
+            </div>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">(11) 99999-9999</span>
+                <span className="text-muted-foreground">{siteConfig.company.whatsapp}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">contato@patalab.com.br</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">São Paulo - SP</span>
               </div>
             </div>
           </div>
@@ -106,7 +112,7 @@ const Footer = () => {
 
         <Separator className="mb-6" />
 
-        {/* Trust badges */}
+        {/* Payment seals */}
         <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Shield className="h-4 w-4" />
@@ -127,12 +133,11 @@ const Footer = () => {
         {/* Bottom */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div>
-            © 2024 Pata Lab. Todos os direitos reservados.
+            © 2024 {siteConfig.company.name} — CNPJ {siteConfig.company.cnpj} • Todos os direitos reservados.
           </div>
           <div className="flex gap-4">
-            <a href="#" className="hover:text-foreground">Privacidade</a>
-            <a href="#" className="hover:text-foreground">Termos de Uso</a>
-            <a href="#" className="hover:text-foreground">LGPD</a>
+            <Link to="/privacidade" className="hover:text-foreground">Política de Privacidade</Link>
+            <Link to="/termos" className="hover:text-foreground">Termos de Uso</Link>
           </div>
         </div>
       </div>

@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useCart } from "@/context/CartContext";
 import { useCartUI } from "@/components/cart/CartUIContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import AnnouncementBar from "@/components/AnnouncementBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +24,11 @@ import {
 
 const Header = () => {
   const [selectedSpecies, setSelectedSpecies] = useState<"CACHORRO" | "GATO" | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { session } = useSession();
   const { itemCount } = useCart();
   const { open } = useCartUI();
+  const { favorites } = useFavorites();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -66,10 +70,7 @@ const Header = () => {
 
   return (
     <header className="border-b bg-background sticky top-0 z-50 shadow-sm">
-      {/* Top banner */}
-      <div className="bg-accent text-accent-foreground py-2 text-center text-sm font-medium">
-        🐾 PIX 10% OFF + Frete grátis acima de R$ 99 🐾
-      </div>
+      <AnnouncementBar />
       
       {/* Main header */}
       <div className="container mx-auto px-4 py-4">
@@ -107,15 +108,30 @@ const Header = () => {
               name="search"
               placeholder="Buscar produtos..."
               className="pl-10 rounded-2xl"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               defaultValue={window.location.pathname === '/buscar' ? new URLSearchParams(window.location.search).get('q') || '' : ''}
             />
           </form>
 
           {/* User actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-2xl" asChild>
-              <Link to="/favoritos">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-2xl relative" 
+              asChild
+            >
+              <Link to="/favoritos" aria-label={`Lista de desejos (${favorites.size} produtos)`}>
                 <Heart className="h-5 w-5" />
+                {favorites.size > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                  >
+                    {favorites.size}
+                  </Badge>
+                )}
                 <span className="sr-only">Lista de desejos</span>
               </Link>
             </Button>
@@ -125,6 +141,7 @@ const Header = () => {
               size="icon" 
               className="relative rounded-2xl"
               onClick={open}
+              aria-label={`Carrinho (${itemCount} itens)`}
             >
               <ShoppingCart className="h-5 w-5" />
               {itemCount > 0 && (
