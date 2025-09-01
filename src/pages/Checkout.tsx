@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import CheckoutStepper from "@/components/checkout/CheckoutStepper";
+import ProgressBar from "@/components/checkout/ProgressBar";
+import OrderSummary from "@/components/checkout/OrderSummary";
 import AddAddressDialog from "@/components/checkout/AddAddressDialog";
 import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,7 @@ import { runCheckout } from "@/lib/checkout";
 import { useToast } from "@/hooks/use-toast";
 import { track } from "@/lib/analytics";
 import { useNavigate } from "react-router-dom";
-import { CreditCard, MapPin, Package } from "lucide-react";
+import { CreditCard, MapPin, Package, X, CheckCircle } from "lucide-react";
 
 interface Address {
   id: string;
@@ -65,10 +66,31 @@ export default function Checkout() {
   const [cartId, setCartId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
   const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
   const [totals, setTotals] = useState<{ subtotal: number; discount: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCoupon, setLoadingCoupon] = useState(false);
   const [loadingOrder, setLoadingOrder] = useState(false);
+  
+  // Load draft from localStorage
+  useEffect(() => {
+    const draft = localStorage.getItem('checkout:draftAddress');
+    if (draft) {
+      try {
+        const parsedDraft = JSON.parse(draft);
+        // TODO: Pre-fill form if needed
+      } catch (error) {
+        console.error('Error parsing draft:', error);
+      }
+    }
+  }, []);
+
+  // Track step changes
+  useEffect(() => {
+    if (!loading) {
+      track("checkout_step", { step: currentStep });
+    }
+  }, [currentStep, loading]);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -173,11 +195,14 @@ export default function Checkout() {
     try {
       const result = await runCheckout(cartId, couponCode);
       setTotals(result);
+      setCouponApplied(true);
+      track("apply_coupon", { code: couponCode, ok: true });
       toast({
         title: "Cupom aplicado!",
         description: `Desconto de R$ ${result.discount.toFixed(2)}`,
       });
     } catch (error: any) {
+      track("apply_coupon", { code: couponCode, ok: false });
       toast({
         title: "Erro ao aplicar cupom",
         description: error.message || "Cupom inválido",
@@ -188,8 +213,29 @@ export default function Checkout() {
     }
   };
 
+  const removeCoupon = async () => {
+    if (!cartId) return;
+    
+    setLoadingCoupon(true);
+    try {
+      const result = await runCheckout(cartId, "");
+      setTotals(result);
+      setCouponApplied(false);
+      setCouponCode("");
+      toast({
+        title: "Cupom removido",
+        description: "Desconto removido do pedido",
+      });
+    } catch (error: any) {
+      console.error("Error removing coupon:", error);
+    } finally {
+      setLoadingCoupon(false);
+    }
+  };
+
   const handleStepNext = () => {
     if (currentStep === 1 && !selectedAddressId) {
+      track("form_error", { step: 1, field: "address" });
       toast({
         title: "Selecione um endereço",
         description: "Escolha o endereço de entrega para continuar",
@@ -198,15 +244,23 @@ export default function Checkout() {
       return;
     }
     
-    setCurrentStep(prev => Math.min(prev + 1, 3));
+    if (currentStep < 3) {
+      setCurrentStep(prev => prev + 1);
+      // Smooth scroll to top when changing steps
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleStepBack = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleFinishOrder = async () => {
     if (!selectedAddressId || !cartId) {
+      track("form_error", { step: 3, field: "address" });
       toast({
         title: "Erro",
         description: "Selecione um endereço para continuar",
@@ -227,21 +281,19 @@ export default function Checkout() {
 
       if (error) throw error;
 
-      // Track successful purchase
-      track("purchase", { 
+      // Track successful purchase intent
+      track("purchase_intent", { 
         order_id: data.order_id,
-        cart_id: cartId, 
-        total: data.total,
-        payment_method: paymentMethod 
+        total: data.total
       });
       
       toast({
         title: "Pedido criado com sucesso!",
-        description: `Referência: ${data.payment.reference}`,
+        description: "Redirecionando para a confirmação...",
       });
 
-      // Navigate to orders page
-      navigate("/meus-pedidos");
+      // Navigate to order detail with created status
+      navigate(`/pedido/${data.order_id}?status=created`);
       
     } catch (error: any) {
       console.error("Error creating order:", error);
@@ -250,6 +302,8 @@ export default function Checkout() {
         description: error.message || "Tente novamente mais tarde",
         variant: "destructive",
       });
+      // Scroll to top to show error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoadingOrder(false);
     }
@@ -283,7 +337,7 @@ export default function Checkout() {
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-8">Finalizar Pedido</h1>
           
-          <CheckoutStepper currentStep={currentStep} steps={steps} />
+          <ProgressBar currentStep={currentStep} steps={steps} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -375,20 +429,42 @@ export default function Checkout() {
                       <CardTitle>Cupom de Desconto</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Digite seu cupom"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
-                        />
-                        <Button 
-                          onClick={applyCoupon}
-                          disabled={!couponCode.trim() || loadingCoupon}
-                          variant="outline"
-                        >
-                          {loadingCoupon ? "..." : "Aplicar"}
-                        </Button>
-                      </div>
+                      {couponApplied ? (
+                        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">
+                              Cupom "{couponCode}" aplicado
+                            </span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={removeCoupon}
+                            disabled={loadingCoupon}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Digite seu cupom"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && applyCoupon()}
+                            disabled={loadingCoupon}
+                          />
+                          <Button 
+                            onClick={applyCoupon}
+                            disabled={!couponCode.trim() || loadingCoupon}
+                            variant="outline"
+                          >
+                            {loadingCoupon ? "..." : "Aplicar"}
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -498,65 +574,42 @@ export default function Checkout() {
             </div>
 
             {/* Sidebar - Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-4">
-                <CardHeader>
-                  <CardTitle>Resumo do Pedido</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal:</span>
-                      <span>R$ {totals?.subtotal.toFixed(2) || "0,00"}</span>
-                    </div>
-                    {totals && totals.discount > 0 && (
-                      <div className="flex justify-between text-sm text-secondary">
-                        <span>Desconto:</span>
-                        <span>- R$ {totals.discount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span>Frete:</span>
-                      <span className="text-secondary">Grátis</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-bold">
-                      <span>Total:</span>
-                      <span>R$ {totals?.total.toFixed(2) || "0,00"}</span>
-                    </div>
-                  </div>
+            <div className="lg:sticky lg:top-24 lg:self-start">
+              <OrderSummary 
+                totals={totals}
+                itemCount={cartItems.length}
+                className="mb-6"
+              />
 
-                  <div className="space-y-2">
-                    {currentStep > 1 && (
-                      <Button 
-                        variant="outline" 
-                        onClick={handleStepBack}
-                        className="w-full"
-                      >
-                        Voltar
-                      </Button>
-                    )}
-                    
-                    {currentStep < 3 ? (
-                      <Button 
-                        onClick={handleStepNext}
-                        className="w-full"
-                        disabled={currentStep === 1 && !selectedAddressId}
-                      >
-                        Continuar
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={handleFinishOrder}
-                        className="w-full"
-                        disabled={loadingOrder}
-                      >
-                        {loadingOrder ? "Processando..." : "Finalizar Pedido"}
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Navigation Buttons */}
+              <div className="flex gap-3">
+                {currentStep > 1 && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleStepBack}
+                    className="flex-1"
+                  >
+                    Voltar
+                  </Button>
+                )}
+                {currentStep < 3 ? (
+                  <Button 
+                    onClick={handleStepNext}
+                    disabled={currentStep === 1 && !selectedAddressId}
+                    className="flex-1"
+                  >
+                    Continuar
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleFinishOrder}
+                    disabled={loadingOrder || !selectedAddressId}
+                    className="flex-1"
+                  >
+                    {loadingOrder ? "Processando..." : "Finalizar Pedido"}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,45 +14,101 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
+import { maskCep, maskPhone, fetchAddressByCep, unmaskValue } from "@/lib/mask";
 
 interface AddAddressDialogProps {
   userId: string;
   onAddressAdded: () => void;
 }
 
+interface AddressFormData {
+  name: string;
+  phone: string;
+  street: string;
+  number: string;
+  complement: string;
+  district: string;
+  city: string;
+  state: string;
+  cep: string;
+  is_default: boolean;
+}
+
 export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    street: "",
-    number: "",
-    complement: "",
-    district: "",
-    city: "",
-    state: "",
-    cep: "",
-    is_default: false,
+  const [cepLoading, setCepLoading] = useState(false);
+  
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+    reset
+  } = useForm<AddressFormData>({
+    defaultValues: {
+      name: "",
+      phone: "",
+      street: "",
+      number: "",
+      complement: "",
+      district: "",
+      city: "",
+      state: "",
+      cep: "",
+      is_default: false,
+    }
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const cepValue = watch('cep');
 
+  // Auto-complete address on CEP change
+  useEffect(() => {
+    if (cepValue && unmaskValue(cepValue).length === 8) {
+      handleCepLookup(cepValue);
+    }
+  }, [cepValue]);
+
+  const handleCepLookup = async (cep: string) => {
+    setCepLoading(true);
+    try {
+      const addressData = await fetchAddressByCep(cep);
+      if (addressData) {
+        if (addressData.logradouro) setValue('street', addressData.logradouro);
+        if (addressData.bairro) setValue('district', addressData.bairro);
+        if (addressData.localidade) setValue('city', addressData.localidade);
+        if (addressData.uf) setValue('state', addressData.uf);
+      }
+    } catch (error) {
+      console.error('Error fetching CEP:', error);
+    } finally {
+      setCepLoading(false);
+    }
+  };
+
+  const onSubmit = async (data: AddressFormData) => {
+    setLoading(true);
     try {
       // If setting as default, unset other defaults first
-      if (formData.is_default) {
+      if (data.is_default) {
         await supabase
           .from("addresses")
           .update({ is_default: false })
           .eq("user_id", userId);
       }
 
+      // Clean phone and CEP before saving
+      const cleanData = {
+        ...data,
+        phone: unmaskValue(data.phone),
+        cep: unmaskValue(data.cep),
+      };
+
       const { error } = await supabase
         .from("addresses")
         .insert({
-          ...formData,
+          ...cleanData,
           user_id: userId,
         });
 
@@ -63,18 +120,7 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
       });
 
       setOpen(false);
-      setFormData({
-        name: "",
-        phone: "",
-        street: "",
-        number: "",
-        complement: "",
-        district: "",
-        city: "",
-        state: "",
-        cep: "",
-        is_default: false,
-      });
+      reset();
       onAddressAdded();
     } catch (error: any) {
       toast({
@@ -100,44 +146,87 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
           <DialogTitle>Novo Endereço</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nome do destinatário *</Label>
             <Input
               id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              required
+              {...register("name", { required: "Nome é obrigatório" })}
+              aria-invalid={errors.name ? "true" : "false"}
+              aria-describedby={errors.name ? "name-error" : undefined}
             />
+            {errors.name && (
+              <p id="name-error" className="text-sm text-destructive" role="alert">
+                {errors.name.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Telefone</Label>
+            <Label htmlFor="phone">Telefone *</Label>
             <Input
               id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              placeholder="(11) 99999-9999"
+              {...register("phone", { 
+                required: "Telefone é obrigatório",
+                onChange: (e) => {
+                  const masked = maskPhone(e.target.value);
+                  setValue("phone", masked);
+                }
+              })}
+              aria-invalid={errors.phone ? "true" : "false"}
+              aria-describedby={errors.phone ? "phone-error" : undefined}
             />
+            {errors.phone && (
+              <p id="phone-error" className="text-sm text-destructive" role="alert">
+                {errors.phone.message}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
               <Label htmlFor="cep">CEP *</Label>
-              <Input
-                id="cep"
-                value={formData.cep}
-                onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="cep"
+                  placeholder="12345-678"
+                  {...register("cep", { 
+                    required: "CEP é obrigatório",
+                    onChange: (e) => {
+                      const masked = maskCep(e.target.value);
+                      setValue("cep", masked);
+                    }
+                  })}
+                  aria-invalid={errors.cep ? "true" : "false"}
+                  aria-describedby={errors.cep ? "cep-error" : undefined}
+                />
+                {cepLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                )}
+              </div>
+              {errors.cep && (
+                <p id="cep-error" className="text-sm text-destructive" role="alert">
+                  {errors.cep.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="state">Estado *</Label>
               <Input
                 id="state"
-                value={formData.state}
-                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                required
+                maxLength={2}
+                {...register("state", { required: "Estado é obrigatório" })}
+                aria-invalid={errors.state ? "true" : "false"}
+                aria-describedby={errors.state ? "state-error" : undefined}
               />
+              {errors.state && (
+                <p id="state-error" className="text-sm text-destructive" role="alert">
+                  {errors.state.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -145,20 +234,30 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
             <Label htmlFor="city">Cidade *</Label>
             <Input
               id="city"
-              value={formData.city}
-              onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-              required
+              {...register("city", { required: "Cidade é obrigatória" })}
+              aria-invalid={errors.city ? "true" : "false"}
+              aria-describedby={errors.city ? "city-error" : undefined}
             />
+            {errors.city && (
+              <p id="city-error" className="text-sm text-destructive" role="alert">
+                {errors.city.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="district">Bairro *</Label>
             <Input
               id="district"
-              value={formData.district}
-              onChange={(e) => setFormData(prev => ({ ...prev, district: e.target.value }))}
-              required
+              {...register("district", { required: "Bairro é obrigatório" })}
+              aria-invalid={errors.district ? "true" : "false"}
+              aria-describedby={errors.district ? "district-error" : undefined}
             />
+            {errors.district && (
+              <p id="district-error" className="text-sm text-destructive" role="alert">
+                {errors.district.message}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -166,19 +265,29 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
               <Label htmlFor="street">Rua *</Label>
               <Input
                 id="street"
-                value={formData.street}
-                onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                required
+                {...register("street", { required: "Rua é obrigatória" })}
+                aria-invalid={errors.street ? "true" : "false"}
+                aria-describedby={errors.street ? "street-error" : undefined}
               />
+              {errors.street && (
+                <p id="street-error" className="text-sm text-destructive" role="alert">
+                  {errors.street.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="number">Número *</Label>
               <Input
                 id="number"
-                value={formData.number}
-                onChange={(e) => setFormData(prev => ({ ...prev, number: e.target.value }))}
-                required
+                {...register("number", { required: "Número é obrigatório" })}
+                aria-invalid={errors.number ? "true" : "false"}
+                aria-describedby={errors.number ? "number-error" : undefined}
               />
+              {errors.number && (
+                <p id="number-error" className="text-sm text-destructive" role="alert">
+                  {errors.number.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -186,18 +295,14 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
             <Label htmlFor="complement">Complemento</Label>
             <Input
               id="complement"
-              value={formData.complement}
-              onChange={(e) => setFormData(prev => ({ ...prev, complement: e.target.value }))}
+              {...register("complement")}
             />
           </div>
 
           <div className="flex items-center space-x-2">
             <Checkbox
               id="is_default"
-              checked={formData.is_default}
-              onCheckedChange={(checked) => 
-                setFormData(prev => ({ ...prev, is_default: checked === true }))
-              }
+              {...register("is_default")}
             />
             <Label htmlFor="is_default">Definir como endereço padrão</Label>
           </div>
@@ -206,8 +311,8 @@ export default function AddAddressDialog({ userId, onAddressAdded }: AddAddressD
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? "Salvando..." : "Salvar endereço"}
+            <Button type="submit" disabled={isSubmitting || loading} className="flex-1">
+              {(isSubmitting || loading) ? "Salvando..." : "Salvar endereço"}
             </Button>
           </div>
         </form>

@@ -16,6 +16,7 @@ import Categoria from "./pages/Categoria";
 import Buscar from "./pages/Buscar";
 import Favoritos from "./pages/Favoritos";
 import Checkout from "./pages/Checkout";
+import PedidoDetalhe from "./pages/PedidoDetalhe";
 import MeusPedidos from "./pages/MeusPedidos";
 import Enderecos from "./pages/Enderecos";
 import RequireAuth from "./components/auth/RequireAuth";
@@ -40,7 +41,7 @@ const App = () => (
               <Route path="/buscar" element={<Buscar />} />
               <Route path="/favoritos" element={<Favoritos />} />
               <Route path="/checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
-              <Route path="/meus-pedidos" element={<RequireAuth><MeusPedidos /></RequireAuth>} />
+              <Route path="/pedido/:id" element={<RequireAuth><PedidoDetalhe /></RequireAuth>} />
               <Route path="/enderecos" element={<RequireAuth><Enderecos /></RequireAuth>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
