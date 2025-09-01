@@ -1,21 +1,35 @@
+import React from "react";
 import { cn } from "@/lib/utils";
 
-type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & { 
-  variant?: "primary" | "ghost" | "outline" | "secondary" | "destructive";
+// Create buttonVariants and ButtonProps for shadcn compatibility
+export const buttonVariants = (props: any = {}) => {
+  const { variant = "default", size = "default" } = props;
+  return `btn ${variant === "default" ? "btn-primary" : `btn-${variant}`} ${size !== "default" ? `btn-${size}` : ""}`;
+};
+
+export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "ghost" | "outline" | "secondary" | "destructive" | "default";
   size?: "default" | "sm" | "lg" | "icon";
   asChild?: boolean;
 };
 
-export default function Button({ 
+type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & { 
+  variant?: "primary" | "ghost" | "outline" | "secondary" | "destructive" | "default";
+  size?: "default" | "sm" | "lg" | "icon";
+  asChild?: boolean;
+};
+
+const Button = React.forwardRef<HTMLButtonElement, Props>(({ 
   variant = "primary", 
   size = "default", 
   asChild = false,
   className, 
   ...props 
-}: Props) {
+}, ref) => {
   const baseClasses = "btn";
   const variantClasses = {
     primary: "btn-primary",
+    default: "btn-primary", // Map default to primary
     ghost: "btn-ghost", 
     outline: "border border-input hover:bg-accent",
     secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -36,6 +50,7 @@ export default function Button({
   return (
     <button 
       {...props} 
+      ref={ref}
       className={cn(
         baseClasses,
         variantClasses[variant],
@@ -44,4 +59,9 @@ export default function Button({
       )} 
     />
   );
-}
+});
+
+Button.displayName = "Button";
+
+export default Button;
+export { Button };

@@ -24,7 +24,8 @@ body {
 }
 
 .btn-primary {
-  @apply bg-brand-blue text-white hover:brightness-110 active:brightness-95;
+  @apply text-white hover:brightness-110 active:brightness-95;
+  background-color: #0A66FF;
 }
 
 .btn-ghost {
@@ -32,7 +33,13 @@ body {
 }
 
 .input {
-  @apply w-full rounded-xl border border-line bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand-blue/25;
+  @apply w-full rounded-xl border border-line bg-white px-3 py-2 outline-none;
+  box-shadow: 0 0 0 0 #0A66FF40;
+  transition: box-shadow 0.15s ease;
+}
+
+.input:focus {
+  box-shadow: 0 0 0 3px #0A66FF40;
 }
 
 .badge {
@@ -40,9 +47,11 @@ body {
 }
 
 .badge-sale {
-  @apply bg-brand-yellow text-ink;
+  @apply text-ink;
+  background-color: #F5C518;
 }
 
 .skeleton {
-  @apply animate-pulse bg-slate-200 rounded-xl;
+  @apply animate-pulse rounded-xl;
+  background-color: #E2E8F0;
 }

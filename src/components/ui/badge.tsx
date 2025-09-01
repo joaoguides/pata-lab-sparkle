@@ -1,9 +1,11 @@
 export function Badge({ 
   children, 
-  variant = "sale" 
+  variant = "sale",
+  className = ""
 }: { 
   children: React.ReactNode; 
-  variant?: "sale" | "neutral" | "secondary" | "destructive" | "outline" | "default"
+  variant?: "sale" | "neutral" | "secondary" | "destructive" | "outline" | "default";
+  className?: string;
 }) {
   const base = "badge";
   const variantMap = {
@@ -14,5 +16,5 @@ export function Badge({
     outline: "border border-input",
     default: "bg-primary text-primary-foreground"
   };
-  return <span className={`${base} ${variantMap[variant] || variantMap.sale}`}>{children}</span>;
+  return <span className={`${base} ${variantMap[variant] || variantMap.sale} ${className}`}>{children}</span>;
 }
