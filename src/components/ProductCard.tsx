@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import Button from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import RatingStars from "@/components/ui/RatingStars";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useCart } from "@/context/CartContext";
 import { cn, formatBRL } from "@/lib/utils";
+import { track } from "@/lib/analytics";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductCardProps {
   id: string;
@@ -20,6 +23,7 @@ interface ProductCardProps {
   inStock?: boolean;
   discount?: number;
   slug?: string;
+  variants?: Array<{ id: string; name: string; price: number; stock: number }>;
 }
 
 export default function ProductCard({
@@ -34,17 +38,43 @@ export default function ProductCard({
   inStock = true,
   discount,
   slug,
+  variants,
 }: ProductCardProps) {
   const { toggleFavorite, isFavorited } = useFavorites();
   const { addItem } = useCart();
+  const { toast } = useToast();
   const isProductFavorite = isFavorited(id);
+  const [justAdded, setJustAdded] = useState(false);
 
   const discountPercent = compareAtPrice && compareAtPrice > price 
     ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : null;
 
+  // Check if product has only one variant for Quick Add
+  const hasOnlyOneVariant = variants && variants.length === 1;
+
   const handleAddToCart = () => {
     addItem(id, 1);
+  };
+
+  const handleQuickAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!inStock) return;
+    
+    // Set just added state for visual feedback
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 2000);
+    
+    // Show toast notification
+    toast({
+      title: "Produto adicionado!",
+      description: "Abra o carrinho para finalizar sua compra.",
+    });
+    
+    // Track analytics
+    track("quick_add", { product_id: id });
   };
 
   return (
@@ -62,6 +92,7 @@ export default function ProductCard({
             </div>
           )}
           
+          {/* Favorite Button */}
           <Button
             variant="ghost"
             className={cn(
@@ -75,6 +106,23 @@ export default function ProductCard({
           >
             <Heart className={cn("h-4 w-4", isProductFavorite && "fill-current")} />
           </Button>
+
+          {/* Quick Add Button - Only for single variant products */}
+          {hasOnlyOneVariant && inStock && (
+            <Button
+              variant="primary"
+              size="icon"
+              className={cn(
+                "absolute bottom-2 right-2 h-8 w-8 rounded-full shadow-md transition-all duration-200",
+                "opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0",
+                justAdded && "bg-green-600 hover:bg-green-700"
+              )}
+              onClick={handleQuickAdd}
+              aria-label="Adicionar rapidamente"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         
         <div className="p-4 space-y-3">
@@ -110,12 +158,21 @@ export default function ProductCard({
             
             <Button
               variant="primary"
-              onClick={handleAddToCart}
+              onClick={hasOnlyOneVariant ? handleAddToCart : undefined}
               disabled={!inStock}
               className="min-w-[100px]"
+              asChild={!hasOnlyOneVariant}
             >
-              <ShoppingCart size={16} />
-              Adicionar
+              {hasOnlyOneVariant ? (
+                <>
+                  <ShoppingCart size={16} />
+                  Adicionar
+                </>
+              ) : (
+                <Link to={slug ? `/produto/${slug}` : "#"}>
+                  Ver detalhes
+                </Link>
+              )}
             </Button>
           </div>
         </div>

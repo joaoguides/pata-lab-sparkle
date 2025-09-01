@@ -4,19 +4,19 @@ import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { track } from "@/lib/analytics";
 import Button from "@/components/ui/button";
-import Input from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import ProductSkeleton from "@/components/ProductSkeleton";
 import EmptyState from "@/components/EmptyState";
-import { Filter, SlidersHorizontal } from "lucide-react";
+import FilterChips from "@/components/catalog/FilterChips";
+import CollapsibleFilterSidebar from "@/components/catalog/CollapsibleFilterSidebar";
+import LoadMore from "@/components/catalog/LoadMore";
+import ImprovedEmptyState from "@/components/catalog/ImprovedEmptyState";
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
 
 interface Product {
   id: string;
@@ -48,7 +48,9 @@ export default function Categoria() {
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   
   // Filters from URL params
   const species = searchParams.get("species") || "both";
@@ -60,22 +62,45 @@ export default function Categoria() {
 
   useEffect(() => {
     if (slug) {
-      loadCategoryAndProducts();
+      loadCategoryAndProducts(true); // true = reset products
     }
-  }, [slug, searchParams]);
+  }, [slug, species, minPrice, maxPrice, inStock, sort]);
 
-  const loadCategoryAndProducts = async () => {
-    setLoading(true);
+  // Track page view
+  useEffect(() => {
+    if (category) {
+      track("catalog_view", { type: "category", slug, category_name: category.name });
+    }
+  }, [category, slug]);
+
+  const loadCategoryAndProducts = async (resetProducts = false) => {
+    if (resetProducts) {
+      setProducts([]);
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
-      // Load category info
-      const { data: categoryData, error: categoryError } = await supabase
+      // Load category info only once
+      if (!category) {
+        const { data: categoryData, error: categoryError } = await supabase
+          .from("categories")
+          .select("id, name, slug")
+          .eq("slug", slug)
+          .single();
+
+        if (categoryError) throw categoryError;
+        setCategory(categoryData);
+      }
+
+      const currentCategory = category || (await supabase
         .from("categories")
         .select("id, name, slug")
         .eq("slug", slug)
-        .single();
+        .single()).data;
 
-      if (categoryError) throw categoryError;
-      setCategory(categoryData);
+      if (!currentCategory) return;
 
       // Build products query
       let query = supabase
@@ -99,7 +124,7 @@ export default function Categoria() {
           )
         `)
         .eq("active", true)
-        .eq("product_categories.category_id", categoryData.id);
+        .eq("product_categories.category_id", currentCategory.id);
 
       // Apply filters
       if (species !== "both") {
@@ -127,7 +152,8 @@ export default function Categoria() {
       }
 
       // Apply pagination
-      const from = (page - 1) * ITEMS_PER_PAGE;
+      const currentPage = resetProducts ? 1 : page + 1;
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
       const { data: productsData, error: productsError, count } = await query
@@ -135,7 +161,7 @@ export default function Categoria() {
 
       if (productsError) throw productsError;
 
-      // Filter by price range client-side (since we can't easily filter nested variant prices in Supabase)
+      // Filter by price range client-side
       let filteredProducts = productsData || [];
       
       if (minPrice !== "" || maxPrice !== "") {
@@ -151,13 +177,24 @@ export default function Categoria() {
         });
       }
 
-      setProducts(filteredProducts);
+      if (resetProducts) {
+        setProducts(filteredProducts);
+        // Scroll to top when filters change
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setProducts(prev => [...prev, ...filteredProducts]);
+        // Track load more
+        track("catalog_load_more", { page: currentPage });
+      }
+      
       setTotalCount(count || 0);
+      setHasMore(filteredProducts.length === ITEMS_PER_PAGE);
 
     } catch (error) {
       console.error("Error loading category:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -173,14 +210,33 @@ export default function Categoria() {
     });
 
     // Reset to page 1 when filters change
-    if (!updates.page) {
-      newParams.delete("page");
-    }
+    newParams.delete("page");
 
+    setSearchParams(newParams);
+
+    // Track filter changes
+    if (updates.sort) {
+      track("catalog_sort_change", { sort: updates.sort });
+    }
+  };
+
+  const handleLoadMore = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("page", String(page + 1));
+    setSearchParams(newParams);
+    loadCategoryAndProducts(false);
+  };
+
+  const clearAllFilters = () => {
+    const newParams = new URLSearchParams();
     setSearchParams(newParams);
   };
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const clearFilter = (key: string) => {
+    updateFilters({ [key]: null });
+  };
+
+  const hasActiveFilters = Boolean(species !== "both" || minPrice || maxPrice || inStock || (sort && sort !== "popular"));
 
   if (loading) {
     return (
@@ -246,13 +302,19 @@ export default function Categoria() {
       
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
-          <Link to="/" className="hover:text-foreground">
-            Home
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">{category.name}</span>
-        </nav>
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{category.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">{category.name}</h1>
@@ -261,97 +323,38 @@ export default function Categoria() {
           </p>
         </div>
 
+        {/* Filter Chips */}
+        <FilterChips
+          species={species}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          inStock={inStock}
+          sort={sort}
+          onClearFilter={clearFilter}
+          onClearAll={clearAllFilters}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Filters Sidebar */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  Filtros
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Species Filter */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Espécie</Label>
-                  <div className="space-y-2">
-                    {[
-                      { value: "both", label: "Todos" },
-                      { value: "dog", label: "Cães" },
-                      { value: "cat", label: "Gatos" }
-                    ].map((option) => (
-                      <div key={option.value} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`species-${option.value}`}
-                          checked={species === option.value}
-                          onCheckedChange={() => 
-                            updateFilters({ species: option.value === "both" ? null : option.value })
-                          }
-                        />
-                        <Label 
-                          htmlFor={`species-${option.value}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {option.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Price Range */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Preço (R$)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={minPrice}
-                        onChange={(e) => updateFilters({ min: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={maxPrice}
-                        onChange={(e) => updateFilters({ max: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Stock Filter */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="inStock"
-                    checked={inStock}
-                    onCheckedChange={(checked) => 
-                      updateFilters({ inStock: checked ? "true" : null })
-                    }
-                  />
-                  <Label htmlFor="inStock" className="text-sm font-normal cursor-pointer">
-                    Apenas em estoque
-                  </Label>
-                </div>
-              </CardContent>
-            </Card>
+            <CollapsibleFilterSidebar
+              species={species}
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              inStock={inStock}
+              onFiltersChange={updateFilters}
+              pageKey="categoria"
+            />
           </div>
 
           {/* Products Grid */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Sort and Results */}
-            <div className="flex items-center justify-between">
+            {/* Sort and Results Count */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Label className="text-sm font-medium">Ordenar por:</Label>
+                <Label className="text-sm font-medium whitespace-nowrap">Ordenar por:</Label>
                 <Select value={sort} onValueChange={(value) => updateFilters({ sort: value })}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -362,6 +365,12 @@ export default function Categoria() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {products.length > 0 && (
+                <p className="text-sm text-muted-foreground whitespace-nowrap">
+                  Mostrando {Math.min(products.length, ITEMS_PER_PAGE)} de {totalCount} produtos
+                </p>
+              )}
             </div>
 
             {/* Products */}
@@ -392,64 +401,27 @@ export default function Categoria() {
                         brand={product.brand}
                         inStock={minVariant.stock > 0}
                         discount={discount}
+                        variants={product.variants}
                       />
                     );
                   })}
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-2 mt-8">
-                    <Button
-                      variant="outline"
-                      disabled={page <= 1}
-                      onClick={() => updateFilters({ page: String(page - 1) })}
-                    >
-                      Anterior
-                    </Button>
-                    
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (page <= 3) {
-                          pageNum = i + 1;
-                        } else if (page >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i;
-                        } else {
-                          pageNum = page - 2 + i;
-                        }
-
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={page === pageNum ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => updateFilters({ page: String(pageNum) })}
-                          >
-                            {pageNum}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    
-                    <Button
-                      variant="outline"
-                      disabled={page >= totalPages}
-                      onClick={() => updateFilters({ page: String(page + 1) })}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
-                )}
+                {/* Load More */}
+                <LoadMore
+                  loading={loadingMore}
+                  hasMore={hasMore}
+                  onLoadMore={handleLoadMore}
+                  useIntersectionObserver={true}
+                />
               </>
-            ) : (
-              <EmptyState 
+            ) : !loading ? (
+              <ImprovedEmptyState 
                 type="category"
-                description="Nenhum produto encontrado com os filtros selecionados. Tente ajustar os critérios de busca."
+                hasFilters={hasActiveFilters}
+                onClearFilters={hasActiveFilters ? clearAllFilters : undefined}
               />
-            )}
+            ) : null}
           </div>
         </div>
       </main>

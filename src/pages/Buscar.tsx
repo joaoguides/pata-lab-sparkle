@@ -1,21 +1,21 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { track } from "@/lib/analytics";
 import Button from "@/components/ui/button";
-import Input from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import ProductSkeleton from "@/components/ProductSkeleton";
-import EmptyState from "@/components/EmptyState";
-import { Search, Filter } from "lucide-react";
+import FilterChips from "@/components/catalog/FilterChips";
+import CollapsibleFilterSidebar from "@/components/catalog/CollapsibleFilterSidebar";
+import LoadMore from "@/components/catalog/LoadMore";
+import ImprovedEmptyState from "@/components/catalog/ImprovedEmptyState";
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
+import { Search } from "lucide-react";
 
 interface Product {
   id: string;
@@ -39,7 +39,9 @@ export default function Buscar() {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   
   // Search and filters from URL params
   const query = searchParams.get("q") || "";
@@ -52,7 +54,7 @@ export default function Buscar() {
 
   useEffect(() => {
     if (query.trim()) {
-      searchProducts();
+      searchProducts(true); // true = reset products
       // Track search
       track("search", { query, results_count: totalCount });
     } else {
@@ -60,10 +62,23 @@ export default function Buscar() {
       setTotalCount(0);
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [query, species, minPrice, maxPrice, inStock, sort]);
 
-  const searchProducts = async () => {
-    setLoading(true);
+  // Track page view
+  useEffect(() => {
+    if (query) {
+      track("catalog_view", { type: "search", query });
+    }
+  }, [query]);
+
+  const searchProducts = async (resetProducts = false) => {
+    if (resetProducts) {
+      setProducts([]);
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
       // Build search query
       let dbQuery = supabase
@@ -117,7 +132,8 @@ export default function Buscar() {
       }
 
       // Apply pagination
-      const from = (page - 1) * ITEMS_PER_PAGE;
+      const currentPage = resetProducts ? 1 : page + 1;
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
       const { data: productsData, error: productsError, count } = await dbQuery
@@ -141,13 +157,24 @@ export default function Buscar() {
         });
       }
 
-      setProducts(filteredProducts);
+      if (resetProducts) {
+        setProducts(filteredProducts);
+        // Scroll to top when filters change
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        setProducts(prev => [...prev, ...filteredProducts]);
+        // Track load more
+        track("catalog_load_more", { page: currentPage });
+      }
+      
       setTotalCount(count || 0);
+      setHasMore(filteredProducts.length === ITEMS_PER_PAGE);
 
     } catch (error) {
       console.error("Error searching products:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -163,14 +190,37 @@ export default function Buscar() {
     });
 
     // Reset to page 1 when filters change
-    if (!updates.page) {
-      newParams.delete("page");
-    }
+    newParams.delete("page");
 
+    setSearchParams(newParams);
+
+    // Track filter changes
+    if (updates.sort) {
+      track("catalog_sort_change", { sort: updates.sort });
+    }
+  };
+
+  const handleLoadMore = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("page", String(page + 1));
+    setSearchParams(newParams);
+    searchProducts(false);
+  };
+
+  const clearAllFilters = () => {
+    const newParams = new URLSearchParams(searchParams);
+    // Keep the search query but clear filters
+    if (query) {
+      newParams.set("q", query);
+    }
     setSearchParams(newParams);
   };
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const clearFilter = (key: string) => {
+    updateFilters({ [key]: null });
+  };
+
+  const hasActiveFilters = Boolean(species !== "both" || minPrice || maxPrice || inStock || (sort && sort !== "popular"));
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,6 +237,23 @@ export default function Buscar() {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
+        {/* Breadcrumb */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                {query ? `Resultados para "${query}"` : "Buscar"}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex items-center gap-3 mb-6">
           <Search className="h-6 w-6 text-muted-foreground" />
           <div>
@@ -206,227 +273,122 @@ export default function Buscar() {
         </div>
 
         {!query.trim() ? (
-          <EmptyState 
+          <ImprovedEmptyState 
             type="search"
             title="Digite algo para buscar"
             description="Use o campo de busca no topo da página para encontrar produtos"
           />
-        ) : loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="h-6 w-24 bg-muted rounded animate-pulse" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="h-4 bg-muted rounded animate-pulse" />
+        ) : (
+          <>
+            {/* Filter Chips */}
+            <FilterChips
+              species={species}
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              inStock={inStock}
+              sort={sort}
+              onClearFilter={clearFilter}
+              onClearAll={clearAllFilters}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* Filters Sidebar */}
+              <div className="space-y-6">
+                <CollapsibleFilterSidebar
+                  species={species}
+                  minPrice={minPrice}
+                  maxPrice={maxPrice}
+                  inStock={inStock}
+                  onFiltersChange={updateFilters}
+                  pageKey="buscar"
+                />
+              </div>
+
+              {/* Products Grid */}
+              <div className="lg:col-span-3 space-y-6">
+                {/* Sort and Results Count */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Label className="text-sm font-medium whitespace-nowrap">Ordenar por:</Label>
+                    <Select value={sort} onValueChange={(value) => updateFilters({ sort: value })}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="popular">Mais populares</SelectItem>
+                        <SelectItem value="recent">Mais recentes</SelectItem>
+                        <SelectItem value="price_asc">Menor preço</SelectItem>
+                        <SelectItem value="price_desc">Maior preço</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {products.length > 0 && (
+                    <p className="text-sm text-muted-foreground whitespace-nowrap">
+                      Mostrando {Math.min(products.length, ITEMS_PER_PAGE)} de {totalCount} produtos
+                    </p>
+                  )}
+                </div>
+
+                {/* Results */}
+                {loading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from({ length: 9 }).map((_, i) => (
+                      <ProductSkeleton key={i} />
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="lg:col-span-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <ProductSkeleton key={i} />
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Filters Sidebar */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Filter className="h-5 w-5" />
-                    Filtros
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Species Filter */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Espécie</Label>
-                    <div className="space-y-2">
-                      {[
-                        { value: "both", label: "Todos" },
-                        { value: "dog", label: "Cães" },
-                        { value: "cat", label: "Gatos" }
-                      ].map((option) => (
-                        <div key={option.value} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`species-${option.value}`}
-                            checked={species === option.value}
-                            onCheckedChange={() => 
-                              updateFilters({ species: option.value === "both" ? null : option.value })
-                            }
+                ) : products.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {products.map((product) => {
+                        const minVariant = product.variants?.reduce((min, variant) =>
+                          variant.price < min.price ? variant : min
+                        ) || product.variants?.[0];
+
+                        if (!minVariant) return null;
+
+                        const hasDiscount = minVariant.compare_at_price && minVariant.compare_at_price > minVariant.price;
+                        const discount = hasDiscount 
+                          ? Math.round(((minVariant.compare_at_price - minVariant.price) / minVariant.compare_at_price) * 100)
+                          : undefined;
+
+                        return (
+                          <ProductCard
+                            key={product.id}
+                            id={product.id}
+                            name={product.name}
+                            slug={product.slug}
+                            price={minVariant.price}
+                            compareAtPrice={minVariant.compare_at_price || undefined}
+                            image={Array.isArray(product.images) ? product.images[0] : "/placeholder.svg"}
+                            brand={product.brand}
+                            inStock={minVariant.stock > 0}
+                            discount={discount}
+                            variants={product.variants}
                           />
-                          <Label 
-                            htmlFor={`species-${option.value}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {option.label}
-                          </Label>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  </div>
 
-                  <Separator />
-
-                  {/* Price Range */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Preço (R$)</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Input
-                          type="number"
-                          placeholder="Min"
-                          value={minPrice}
-                          onChange={(e) => updateFilters({ min: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Input
-                          type="number"
-                          placeholder="Max"
-                          value={maxPrice}
-                          onChange={(e) => updateFilters({ max: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Stock Filter */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="inStock"
-                      checked={inStock}
-                      onCheckedChange={(checked) => 
-                        updateFilters({ inStock: checked ? "true" : null })
-                      }
+                    {/* Load More */}
+                    <LoadMore
+                      loading={loadingMore}
+                      hasMore={hasMore}
+                      onLoadMore={handleLoadMore}
+                      useIntersectionObserver={true}
                     />
-                    <Label htmlFor="inStock" className="text-sm font-normal cursor-pointer">
-                      Apenas em estoque
-                    </Label>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Products Grid */}
-            <div className="lg:col-span-3 space-y-6">
-              {/* Sort */}
-              <div className="flex items-center gap-4">
-                <Label className="text-sm font-medium">Ordenar por:</Label>
-                <Select value={sort} onValueChange={(value) => updateFilters({ sort: value })}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="popular">Mais populares</SelectItem>
-                    <SelectItem value="recent">Mais recentes</SelectItem>
-                    <SelectItem value="price_asc">Menor preço</SelectItem>
-                    <SelectItem value="price_desc">Maior preço</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </>
+                ) : (
+                  <ImprovedEmptyState 
+                    type="search"
+                    query={query}
+                    hasFilters={hasActiveFilters}
+                    onClearFilters={hasActiveFilters ? clearAllFilters : undefined}
+                  />
+                )}
               </div>
-
-              {/* Results */}
-              {products.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {products.map((product) => {
-                      const minVariant = product.variants?.reduce((min, variant) =>
-                        variant.price < min.price ? variant : min
-                      ) || product.variants?.[0];
-
-                      if (!minVariant) return null;
-
-                      const hasDiscount = minVariant.compare_at_price && minVariant.compare_at_price > minVariant.price;
-                      const discount = hasDiscount 
-                        ? Math.round(((minVariant.compare_at_price - minVariant.price) / minVariant.compare_at_price) * 100)
-                        : undefined;
-
-                      return (
-                        <ProductCard
-                          key={product.id}
-                          id={product.id}
-                          name={product.name}
-                          slug={product.slug}
-                          price={minVariant.price}
-                          compareAtPrice={minVariant.compare_at_price || undefined}
-                          image={Array.isArray(product.images) ? product.images[0] : "/placeholder.svg"}
-                          brand={product.brand}
-                          inStock={minVariant.stock > 0}
-                          discount={discount}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-2 mt-8">
-                      <Button
-                        variant="outline"
-                        disabled={page <= 1}
-                        onClick={() => updateFilters({ page: String(page - 1) })}
-                      >
-                        Anterior
-                      </Button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (page <= 3) {
-                            pageNum = i + 1;
-                          } else if (page >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = page - 2 + i;
-                          }
-
-                          return (
-                            <Button
-                              key={pageNum}
-                              variant={page === pageNum ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => updateFilters({ page: String(pageNum) })}
-                            >
-                              {pageNum}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                      
-                      <Button
-                        variant="outline"
-                        disabled={page >= totalPages}
-                        onClick={() => updateFilters({ page: String(page + 1) })}
-                      >
-                        Próxima
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <EmptyState 
-                  type="search"
-                  title={`Nenhum produto encontrado para "${query}"`}
-                  description="Tente buscar com outras palavras ou confira nossa seleção completa"
-                />
-              )}
             </div>
-          </div>
+          </>
         )}
       </main>
 
