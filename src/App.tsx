@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { CartProvider } from "./context/CartContext";
+import { CartUIProvider } from "./components/cart/CartUIContext";
 import CartDrawer from "./components/cart/CartDrawer";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -29,7 +30,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <CartProvider>
-            <Routes>
+            <CartUIProvider>
+              <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/entrar" element={<Entrar />} />
               <Route path="/criar-conta" element={<CriarConta />} />
@@ -42,8 +44,9 @@ const App = () => (
               <Route path="/enderecos" element={<RequireAuth><Enderecos /></RequireAuth>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
-            <CartDrawer />
+              </Routes>
+              <CartDrawer />
+            </CartUIProvider>
           </CartProvider>
         </BrowserRouter>
       </TooltipProvider>

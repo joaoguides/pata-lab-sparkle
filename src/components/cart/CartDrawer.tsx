@@ -11,6 +11,7 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { useCart } from "@/context/CartContext";
+import { useCartUI } from "./CartUIContext";
 import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/integrations/supabase/client";
 import { runCheckout } from "@/lib/checkout";
@@ -18,7 +19,8 @@ import { toast } from "@/hooks/use-toast";
 
 export default function CartDrawer() {
   const { session } = useSession();
-  const { items, isOpen, setIsOpen, updateQuantity, removeItem, refreshCart } = useCart();
+  const { items, updateQuantity, removeItem, refreshCart } = useCart();
+  const { isOpen, close } = useCartUI();
   const navigate = useNavigate();
   
   const [couponCode, setCouponCode] = useState("");
@@ -87,12 +89,12 @@ export default function CartDrawer() {
   };
 
   const handleCheckout = () => {
-    setIsOpen(false);
+    close();
     navigate("/checkout");
   };
 
   return (
-    <Drawer open={isOpen} onOpenChange={setIsOpen}>
+    <Drawer open={isOpen} onOpenChange={close}>
       <DrawerContent className="h-[85vh]">
         <DrawerHeader className="border-b">
           <DrawerTitle className="flex items-center gap-2">
@@ -112,10 +114,10 @@ export default function CartDrawer() {
               <p className="text-muted-foreground">Faça login ou crie uma conta para salvar seus itens</p>
               <div className="flex gap-2">
                 <Button asChild variant="outline">
-                  <Link to="/entrar" onClick={() => setIsOpen(false)}>Entrar</Link>
+                  <Link to="/entrar" onClick={close}>Entrar</Link>
                 </Button>
                 <Button asChild>
-                  <Link to="/criar-conta" onClick={() => setIsOpen(false)}>Criar conta</Link>
+                  <Link to="/criar-conta" onClick={close}>Criar conta</Link>
                 </Button>
               </div>
             </div>
@@ -124,7 +126,7 @@ export default function CartDrawer() {
               <ShoppingCart className="h-16 w-16 text-muted-foreground" />
               <h3 className="text-lg font-semibold">Seu carrinho está vazio</h3>
               <p className="text-muted-foreground">Adicione produtos para começar suas compras</p>
-              <Button onClick={() => setIsOpen(false)}>Continuar comprando</Button>
+              <Button onClick={close}>Continuar comprando</Button>
             </div>
           ) : (
             <div className="p-4 space-y-4">

@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useCart } from "@/context/CartContext";
+import { useCartUI } from "@/components/cart/CartUIContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +23,8 @@ import {
 const Header = () => {
   const [selectedSpecies, setSelectedSpecies] = useState<"CACHORRO" | "GATO" | null>(null);
   const { session } = useSession();
-  const { itemCount, setIsOpen } = useCart();
+  const { itemCount } = useCart();
+  const { open } = useCartUI();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -122,7 +124,7 @@ const Header = () => {
               variant="ghost" 
               size="icon" 
               className="relative rounded-2xl"
-              onClick={() => setIsOpen(true)}
+              onClick={open}
             >
               <ShoppingCart className="h-5 w-5" />
               {itemCount > 0 && (
