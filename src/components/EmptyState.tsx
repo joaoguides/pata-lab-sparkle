@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import Button from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Search, ShoppingBag, Heart } from "lucide-react";
 import { Link } from "react-router-dom";

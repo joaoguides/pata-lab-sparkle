@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useCart } from "@/context/CartContext";
 import { track } from "@/lib/analytics";
-import { Button } from "@/components/ui/button";
+import Button from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

@@ -1,10 +1,12 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import Button from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart, Star, ShoppingCart } from "lucide-react";
+import RatingStars from "@/components/ui/RatingStars";
+import { Heart, ShoppingCart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useFavorites } from "@/hooks/useFavorites";
-import { cn } from "@/lib/utils";
+import { useCart } from "@/context/CartContext";
+import { cn, formatBRL } from "@/lib/utils";
 
 interface ProductCardProps {
   id: string;
@@ -34,111 +36,86 @@ export default function ProductCard({
   slug,
 }: ProductCardProps) {
   const { toggleFavorite, isFavorited } = useFavorites();
-  const favorited = isFavorited(id);
+  const { addItem } = useCart();
+  const isProductFavorite = isFavorited(id);
+
+  const discountPercent = compareAtPrice && compareAtPrice > price 
+    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+    : null;
+
+  const handleAddToCart = () => {
+    addItem(id, 1);
+  };
 
   return (
     <Card className="group cursor-pointer border-0 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-0">
         <div className="relative overflow-hidden rounded-t-lg">
-          <Link to={slug ? `/produto/${slug}` : "#"}>
-            <img
-              src={image || "/placeholder.svg"}
-              alt={name}
-              className="aspect-square w-full object-cover transition-transform group-hover:scale-105"
-            />
-          </Link>
-          
-          {/* Discount Badge */}
-          {discount && (
-            <Badge 
-              variant="destructive" 
-              className="absolute top-2 left-2"
-            >
-              -{discount}%
-            </Badge>
+          <img 
+            src={image || "/placeholder.svg"} 
+            alt={name}
+            className="aspect-square w-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {discountPercent && (
+            <div className="absolute top-2 left-2">
+              <Badge variant="sale">-{discountPercent}%</Badge>
+            </div>
           )}
           
-          {/* Favorite Button */}
           <Button
-            size="sm"
             variant="ghost"
             className={cn(
-              "absolute top-2 right-2 h-8 w-8 rounded-full bg-background/80 p-0 backdrop-blur-sm hover:bg-background/90",
-              favorited && "text-red-500 hover:text-red-600"
+              "absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 p-0 backdrop-blur-sm hover:bg-white/90",
+              isProductFavorite && "text-red-500 hover:text-red-600"
             )}
             onClick={(e) => {
               e.preventDefault();
               toggleFavorite(id);
             }}
           >
-            <Heart className={cn("h-4 w-4", favorited && "fill-current")} />
-            <span className="sr-only">Adicionar aos favoritos</span>
+            <Heart className={cn("h-4 w-4", isProductFavorite && "fill-current")} />
           </Button>
         </div>
         
         <div className="p-4 space-y-3">
-          {/* Brand */}
           {brand && (
-            <Badge variant="secondary" className="text-xs">
-              {brand}
-            </Badge>
+            <Badge variant="neutral">{brand}</Badge>
           )}
           
-          {/* Product Name */}
           <Link to={slug ? `/produto/${slug}` : "#"}>
             <h3 className="font-semibold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
               {name}
             </h3>
           </Link>
           
-          {/* Rating */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-3 w-3 ${
-                    i < Math.floor(rating) 
-                      ? "fill-yellow-400 text-yellow-400" 
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-            </div>
-            {reviewCount > 0 && (
-              <span className="text-xs text-muted-foreground">
-                ({reviewCount})
-              </span>
-            )}
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <RatingStars value={rating} />
+            {reviewCount > 0 && <span>({reviewCount})</span>}
           </div>
           
-          {/* Price and Actions */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-primary">
-                  R$ {price.toFixed(2)}
-                </span>
-                {compareAtPrice && compareAtPrice > price && (
-                  <span className="text-xs text-muted-foreground line-through">
-                    R$ {compareAtPrice.toFixed(2)}
-                  </span>
-                )}
-              </div>
+              <p className="text-lg font-bold text-primary">
+                {formatBRL(price)}
+              </p>
+              {compareAtPrice && compareAtPrice > price && (
+                <p className="text-sm text-muted-foreground line-through">
+                  {formatBRL(compareAtPrice)}
+                </p>
+              )}
               {!inStock && (
-                <span className="text-xs text-destructive font-medium">
-                  Fora de estoque
-                </span>
+                <p className="text-sm text-red-600">Fora de estoque</p>
               )}
             </div>
             
             <Button
-              size="sm"
+              variant="primary"
+              onClick={handleAddToCart}
               disabled={!inStock}
-              className="rounded-full"
+              className="min-w-[100px]"
             >
-              <ShoppingCart className="h-4 w-4" />
-              <span className="sr-only">Adicionar ao carrinho</span>
+              <ShoppingCart size={16} />
+              Adicionar
             </Button>
           </div>
         </div>

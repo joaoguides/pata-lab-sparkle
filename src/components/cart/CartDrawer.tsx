@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Minus, Plus, X, ShoppingCart } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import Button from "@/components/ui/button";
+import Input from "@/components/ui/input";
 import {
   Drawer,
   DrawerContent,
